@@ -1,0 +1,6 @@
+@Scribe.WebApi.Sample_HostAddress = http://localhost:5013
+
+GET {{Scribe.WebApi.Sample_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
