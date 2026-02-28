@@ -28,5 +28,5 @@ public sealed class ExceptionInfo
     public string Type { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
     public string? StackTrace { get; set; }
-    public Dictionary<string, string?> Data { get; set; } = new();
+    public Dictionary<string, object?> Data { get; set; } = new();
 }

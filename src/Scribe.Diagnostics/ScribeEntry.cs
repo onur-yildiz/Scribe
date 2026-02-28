@@ -129,9 +129,13 @@ public sealed class ScribeEntry : IScribeEntry
         _activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
         _record.Status = "Error";
 
-        var data = new Dictionary<string, string?>();
+        var data = new Dictionary<string, object?>();
         foreach (System.Collections.DictionaryEntry entry in ex.Data)
-            data[entry.Key?.ToString() ?? string.Empty] = entry.Value?.ToString();
+        {
+            var key = entry.Key?.ToString() ?? string.Empty;
+            var redactedValue = RedactValue(key, entry.Value);
+            data[key] = ToBsonValue(redactedValue);
+        }
 
         _record.Exceptions.Add(new ExceptionInfo
         {
