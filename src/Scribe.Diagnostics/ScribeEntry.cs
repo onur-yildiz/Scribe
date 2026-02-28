@@ -6,6 +6,9 @@ using Scribe.Diagnostics.Models;
 
 namespace Scribe.Diagnostics;
 
+/// <summary>
+/// Default implementation of <see cref="IScribeEntry"/> backed by <see cref="Activity"/>.
+/// </summary>
 public sealed class ScribeEntry : IScribeEntry
 {
     private static readonly ActivitySource _source = new("Scribe.Diagnostics");
@@ -20,6 +23,12 @@ public sealed class ScribeEntry : IScribeEntry
     private readonly IScribeRedactor[] _redactors;
     private bool _disposed;
 
+    /// <summary>
+    /// Initializes a new entry for a specific operation.
+    /// </summary>
+    /// <param name="operationName">Operation name.</param>
+    /// <param name="channel">Output channel.</param>
+    /// <param name="redactors">Redactors to apply to captured values.</param>
     public ScribeEntry(string operationName, ScribeChannel channel, IEnumerable<IScribeRedactor> redactors)
     {
         _channel = channel;
@@ -36,6 +45,7 @@ public sealed class ScribeEntry : IScribeEntry
         };
     }
 
+    /// <inheritdoc />
     public void Note(string key, string value)
     {
         var redactedValue = RedactValue(key, value);
@@ -44,11 +54,13 @@ public sealed class ScribeEntry : IScribeEntry
         _activity?.SetTag(key, valueString);
     }
 
+    /// <inheritdoc />
     public void AddBaggage(string key, string value)
     {
         _activity?.AddBaggage(key, value);
     }
 
+    /// <inheritdoc />
     public void AddEvent(string name, Dictionary<string, object>? tags = null)
     {
         ActivityTagsCollection? tagsCollection = null;
@@ -64,6 +76,7 @@ public sealed class ScribeEntry : IScribeEntry
         _activity?.AddEvent(activityEvent);
     }
 
+    /// <inheritdoc />
     public void AttachDump(string key, object? payload)
     {
         var redactedValue = RedactValue(key, payload);
@@ -124,6 +137,7 @@ public sealed class ScribeEntry : IScribeEntry
         };
 
 
+    /// <inheritdoc />
     public void Fault(Exception ex)
     {
         _activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
@@ -146,6 +160,7 @@ public sealed class ScribeEntry : IScribeEntry
         });
     }
 
+    /// <inheritdoc />
     public void Dispose()
     {
         if (_disposed) return;

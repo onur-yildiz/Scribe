@@ -1,9 +1,16 @@
 namespace Scribe.Diagnostics;
 
+/// <summary>
+/// Redacts values whose keys are configured as sensitive.
+/// </summary>
 public sealed class DefaultSensitiveKeyRedactor : IScribeRedactor
 {
     private readonly HashSet<string> _sensitiveKeys;
 
+    /// <summary>
+    /// Initializes a new redactor instance from options.
+    /// </summary>
+    /// <param name="options">Redaction options.</param>
     public DefaultSensitiveKeyRedactor(DefaultSensitiveKeyRedactorOptions options)
     {
         _sensitiveKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -16,6 +23,7 @@ public sealed class DefaultSensitiveKeyRedactor : IScribeRedactor
         }
     }
 
+    /// <inheritdoc />
     public object? Redact(string key, object? value) =>
         _sensitiveKeys.Contains(NormalizeKey(key)) ? "[*** REDACTED ***]" : value;
 

@@ -5,4 +5,7 @@
   <Folder Name="/src/">
     <Project Path="src/Scribe.Diagnostics/Scribe.Diagnostics.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Scribe.Diagnostics.Tests/Scribe.Diagnostics.Tests.csproj" />
+  </Folder>
 </Solution>
