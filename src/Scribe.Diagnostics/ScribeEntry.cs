@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using MongoDB.Bson;
 using Scribe.Diagnostics.Models;
 
@@ -7,6 +9,10 @@ namespace Scribe.Diagnostics;
 public sealed class ScribeEntry : IScribeEntry
 {
     private static readonly ActivitySource _source = new("Scribe.Diagnostics");
+    private static readonly JsonSerializerOptions _dumpJsonOptions = new()
+    {
+        ReferenceHandler = ReferenceHandler.IgnoreCycles
+    };
 
     private readonly Activity? _activity;
     private readonly MongoActivityRecord _record;
@@ -40,7 +46,8 @@ public sealed class ScribeEntry : IScribeEntry
     private static BsonValue ToBsonValue(object? payload)
     {
         if (payload is null) return BsonNull.Value;
-        if (payload is BsonValue bv) return bv;
+        if (payload is BsonValue bsonValue) return bsonValue;
+
         try
         {
             return BsonValue.Create(payload);
@@ -49,15 +56,36 @@ public sealed class ScribeEntry : IScribeEntry
         {
             try
             {
-                var json = System.Text.Json.JsonSerializer.Serialize(payload);
-                return BsonDocument.Parse($"{{\"v\":{json}}}")["v"];
+                var jsonElement = JsonSerializer.SerializeToElement(payload, _dumpJsonOptions);
+                return ToBsonValue(jsonElement);
             }
             catch
             {
-                return new BsonString(payload.ToString() ?? string.Empty);
+                var fallback = payload.GetType().FullName is { Length: > 0 } fullName
+                    ? $"{fullName}: {payload}"
+                    : payload.ToString() ?? string.Empty;
+
+                return new BsonString(fallback);
             }
         }
     }
+
+    private static BsonValue ToBsonValue(JsonElement element) =>
+        element.ValueKind switch
+        {
+            JsonValueKind.Object => new BsonDocument(element.EnumerateObject()
+                .Select(prop => new BsonElement(prop.Name, ToBsonValue(prop.Value)))),
+            JsonValueKind.Array => new BsonArray(element.EnumerateArray().Select(ToBsonValue)),
+            JsonValueKind.String => new BsonString(element.GetString() ?? string.Empty),
+            JsonValueKind.Number when element.TryGetInt32(out var i) => new BsonInt32(i),
+            JsonValueKind.Number when element.TryGetInt64(out var l) => new BsonInt64(l),
+            JsonValueKind.Number when element.TryGetDecimal(out var d) => new BsonDecimal128(d),
+            JsonValueKind.Number => new BsonDouble(element.GetDouble()),
+            JsonValueKind.True => BsonBoolean.True,
+            JsonValueKind.False => BsonBoolean.False,
+            _ => BsonNull.Value
+        };
+
 
     public void Fault(Exception ex)
     {
