@@ -90,6 +90,18 @@ builder.Services.AddDefaultSensiviteKeyRedactor(options =>
 });
 ```
 
+## Dashboard UI (Next.js + shadcn)
+
+A new dashboard app is available at `src/scribe-diagnostics-dashboard` for mobile-friendly trace exploration and payload inspection.
+
+Run it locally:
+
+```bash
+cd src/scribe-diagnostics-dashboard
+npm install
+npm run dev
+```
+
 ## Package development
 
 Build and test:
