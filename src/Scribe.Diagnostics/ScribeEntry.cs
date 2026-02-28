@@ -17,11 +17,13 @@ public sealed class ScribeEntry : IScribeEntry
     private readonly Activity? _activity;
     private readonly MongoActivityRecord _record;
     private readonly ScribeChannel _channel;
+    private readonly IScribeRedactor[] _redactors;
     private bool _disposed;
 
-    public ScribeEntry(string operationName, ScribeChannel channel)
+    public ScribeEntry(string operationName, ScribeChannel channel, IEnumerable<IScribeRedactor> redactors)
     {
         _channel = channel;
+        _redactors = redactors as IScribeRedactor[] ?? redactors.ToArray();
         _activity = _source.StartActivity(operationName);
 
         _record = new MongoActivityRecord
@@ -36,12 +38,28 @@ public sealed class ScribeEntry : IScribeEntry
 
     public void Note(string key, string value)
     {
-        _activity?.SetTag(key, value);
-        _record.Tags[key] = value;
+        var redactedValue = RedactValue(key, value);
+        var valueString = redactedValue?.ToString() ?? string.Empty;
+
+        _activity?.SetTag(key, valueString);
+        _record.Tags[key] = valueString;
     }
 
-    public void AttachDump(string key, object? payload) =>
-        _record.Dump[key] = ToBsonValue(payload);
+    public void AttachDump(string key, object? payload)
+    {
+        var redactedValue = RedactValue(key, payload);
+        _record.Dump[key] = ToBsonValue(redactedValue);
+    }
+
+    private object? RedactValue(string key, object? value)
+    {
+        var redacted = value;
+
+        foreach (var redactor in _redactors)
+            redacted = redactor.Redact(key, redacted);
+
+        return redacted;
+    }
 
     private static BsonValue ToBsonValue(object? payload)
     {

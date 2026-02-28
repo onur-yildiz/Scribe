@@ -26,4 +26,16 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+
+    public static IServiceCollection AddDefaultSensiviteKeyRedactor(
+        this IServiceCollection services,
+        Action<DefaultSensitiveKeyRedactorOptions>? configure = null)
+    {
+        var options = new DefaultSensitiveKeyRedactorOptions();
+        configure?.Invoke(options);
+
+        services.AddSingleton<IScribeRedactor>(_ => new DefaultSensitiveKeyRedactor(options));
+
+        return services;
+    }
 }
