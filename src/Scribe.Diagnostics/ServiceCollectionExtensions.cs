@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
+using Scribe.Diagnostics.Models;
+using Scribe.Diagnostics.Queries;
 
 namespace Scribe.Diagnostics;
 
@@ -32,6 +34,20 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IMongoClient>().GetDatabase(options.DatabaseName));
 
         services.AddHostedService<ScribeMongoWorker>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers read-side query services and startup index creation.
+    /// </summary>
+    public static IServiceCollection AddScribeActivityReadSide(this IServiceCollection services)
+    {
+        services.AddSingleton(sp =>
+            sp.GetRequiredService<IMongoDatabase>().GetCollection<MongoActivityRecord>(MongoCollectionNames.ScribeActivities));
+
+        services.AddSingleton<IActivityQueryService, ActivityQueryService>();
+        services.AddHostedService<ScribeActivityIndexInitializer>();
 
         return services;
     }

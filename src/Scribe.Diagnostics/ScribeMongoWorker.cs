@@ -13,7 +13,6 @@ public sealed class ScribeMongoWorker : BackgroundService
 {
     private const int BatchSize = 100;
     private static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(1);
-    private const string CollectionName = "ScribeActivities";
     private const int BsonObjectTooLargeErrorCode = 10334;
     private const string DumpErrorFieldName = "__ScribeError";
     private const string PayloadDroppedMessage = "Payload dropped. Exceeded MongoDB 16MB BSON limit.";
@@ -31,7 +30,7 @@ public sealed class ScribeMongoWorker : BackgroundService
     public ScribeMongoWorker(ScribeChannel channel, IMongoDatabase database, ILogger<ScribeMongoWorker> logger)
     {
         _channel = channel;
-        _collection = database.GetCollection<MongoActivityRecord>(CollectionName);
+        _collection = database.GetCollection<MongoActivityRecord>(MongoCollectionNames.ScribeActivities);
         _logger = logger;
     }
 
