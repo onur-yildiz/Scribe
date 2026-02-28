@@ -17,6 +17,7 @@ public sealed class MongoActivityRecord
     public string Status { get; set; } = "Ok";
 
     public Dictionary<string, string> Tags { get; set; } = new();
+    public Dictionary<string, string> Baggage { get; set; } = new();
     public Dictionary<string, BsonValue> Dump { get; set; } = new();
     public List<ExceptionInfo> Exceptions { get; set; } = new();
 }
