@@ -49,6 +49,21 @@ public sealed class ScribeEntry : IScribeEntry
         _activity?.AddBaggage(key, value);
     }
 
+    public void AddEvent(string name, Dictionary<string, object>? tags = null)
+    {
+        ActivityTagsCollection? tagsCollection = null;
+
+        if (tags is { Count: > 0 })
+        {
+            tagsCollection = new ActivityTagsCollection();
+            foreach (var tag in tags)
+                tagsCollection.Add(tag.Key, tag.Value);
+        }
+
+        var activityEvent = new ActivityEvent(name, DateTimeOffset.UtcNow, tagsCollection);
+        _activity?.AddEvent(activityEvent);
+    }
+
     public void AttachDump(string key, object? payload)
     {
         var redactedValue = RedactValue(key, payload);
@@ -139,6 +154,23 @@ public sealed class ScribeEntry : IScribeEntry
 
             foreach (var baggage in _activity.Baggage)
                 _record.Baggage[baggage.Key] = baggage.Value ?? string.Empty;
+
+            if (_activity.Events.Any())
+            {
+                foreach (var activityEvent in _activity.Events)
+                {
+                    var eventRecord = new ScribeEventRecord
+                    {
+                        Name = activityEvent.Name,
+                        Timestamp = activityEvent.Timestamp
+                    };
+
+                    foreach (var tag in activityEvent.Tags)
+                        eventRecord.Tags[tag.Key] = tag.Value ?? string.Empty;
+
+                    _record.Events.Add(eventRecord);
+                }
+            }
         }
 
         _record.Duration = DateTime.UtcNow - _record.StartTimeUtc;
