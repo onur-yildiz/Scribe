@@ -1,5 +1,8 @@
 namespace Scribe.Diagnostics;
 
+/// <summary>
+/// Options for the built-in sensitive-key redactor.
+/// </summary>
 public sealed class DefaultSensitiveKeyRedactorOptions
 {
     private static readonly string[] _defaultSensitiveKeys =
@@ -32,8 +35,16 @@ public sealed class DefaultSensitiveKeyRedactorOptions
 
     private readonly HashSet<string> _sensitiveKeys = new(_defaultSensitiveKeys, StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Gets the current sensitive key set.
+    /// </summary>
     public IReadOnlySet<string> SensitiveKeys => _sensitiveKeys;
 
+    /// <summary>
+    /// Adds a key to the sensitive key set.
+    /// </summary>
+    /// <param name="key">Key to mark as sensitive.</param>
+    /// <returns>The current options instance.</returns>
     public DefaultSensitiveKeyRedactorOptions AddSensitiveKey(string key)
     {
         if (!string.IsNullOrWhiteSpace(key))
@@ -42,6 +53,11 @@ public sealed class DefaultSensitiveKeyRedactorOptions
         return this;
     }
 
+    /// <summary>
+    /// Removes a key from the sensitive key set.
+    /// </summary>
+    /// <param name="key">Key to remove.</param>
+    /// <returns>The current options instance.</returns>
     public DefaultSensitiveKeyRedactorOptions RemoveSensitiveKey(string key)
     {
         if (!string.IsNullOrWhiteSpace(key))
@@ -50,6 +66,10 @@ public sealed class DefaultSensitiveKeyRedactorOptions
         return this;
     }
 
+    /// <summary>
+    /// Clears all configured sensitive keys.
+    /// </summary>
+    /// <returns>The current options instance.</returns>
     public DefaultSensitiveKeyRedactorOptions ClearSensitiveKeys()
     {
         _sensitiveKeys.Clear();

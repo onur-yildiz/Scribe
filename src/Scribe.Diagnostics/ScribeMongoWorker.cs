@@ -6,6 +6,9 @@ using Scribe.Diagnostics.Models;
 
 namespace Scribe.Diagnostics;
 
+/// <summary>
+/// Background worker that batches and writes activity records into MongoDB.
+/// </summary>
 public sealed class ScribeMongoWorker : BackgroundService
 {
     private const int BatchSize = 100;
@@ -19,6 +22,12 @@ public sealed class ScribeMongoWorker : BackgroundService
     private readonly IMongoCollection<MongoActivityRecord> _collection;
     private readonly ILogger<ScribeMongoWorker> _logger;
 
+    /// <summary>
+    /// Initializes a new worker instance.
+    /// </summary>
+    /// <param name="channel">Record source channel.</param>
+    /// <param name="database">MongoDB database.</param>
+    /// <param name="logger">Logger instance.</param>
     public ScribeMongoWorker(ScribeChannel channel, IMongoDatabase database, ILogger<ScribeMongoWorker> logger)
     {
         _channel = channel;
@@ -26,6 +35,7 @@ public sealed class ScribeMongoWorker : BackgroundService
         _logger = logger;
     }
 
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var buffer = new List<MongoActivityRecord>(BatchSize);
@@ -58,6 +68,7 @@ public sealed class ScribeMongoWorker : BackgroundService
             await FlushAsync(buffer, stoppingToken).ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         _channel.Complete();
