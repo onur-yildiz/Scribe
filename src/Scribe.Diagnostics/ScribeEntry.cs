@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using MongoDB.Bson;
 using Scribe.Diagnostics.Models;
 
 namespace Scribe.Diagnostics;
@@ -33,8 +34,23 @@ public sealed class ScribeEntry : IScribeEntry
         _record.Tags[key] = value;
     }
 
-    public void AttachDump(string key, object payload) =>
-        _record.Dump[key] = payload;
+    public void AttachDump(string key, object? payload) =>
+        _record.Dump[key] = ToBsonValue(payload);
+
+    private static BsonValue ToBsonValue(object? payload)
+    {
+        if (payload is null) return BsonNull.Value;
+        if (payload is BsonValue bv) return bv;
+        try
+        {
+            var json = System.Text.Json.JsonSerializer.Serialize(payload);
+            return BsonDocument.Parse($"{{\"v\":{json}}}")["v"];
+        }
+        catch
+        {
+            return new BsonString(payload.ToString() ?? string.Empty);
+        }
+    }
 
     public void Fault(Exception ex)
     {
