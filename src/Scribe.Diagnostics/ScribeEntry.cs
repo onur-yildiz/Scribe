@@ -42,7 +42,11 @@ public sealed class ScribeEntry : IScribeEntry
         var valueString = redactedValue?.ToString() ?? string.Empty;
 
         _activity?.SetTag(key, valueString);
-        _record.Tags[key] = valueString;
+    }
+
+    public void AddBaggage(string key, string value)
+    {
+        _activity?.AddBaggage(key, value);
     }
 
     public void AttachDump(string key, object? payload)
@@ -127,6 +131,15 @@ public sealed class ScribeEntry : IScribeEntry
     {
         if (_disposed) return;
         _disposed = true;
+
+        if (_activity is not null)
+        {
+            foreach (var tag in _activity.Tags)
+                _record.Tags[tag.Key] = tag.Value ?? string.Empty;
+
+            foreach (var baggage in _activity.Baggage)
+                _record.Baggage[baggage.Key] = baggage.Value ?? string.Empty;
+        }
 
         _record.Duration = DateTime.UtcNow - _record.StartTimeUtc;
         _activity?.Stop();
