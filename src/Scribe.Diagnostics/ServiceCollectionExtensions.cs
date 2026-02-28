@@ -3,21 +3,16 @@ using MongoDB.Driver;
 
 namespace Scribe.Diagnostics;
 
-public sealed class ScribeDiagnosticsOptions
-{
-    public string ConnectionString { get; set; } = "mongodb://localhost:27017";
-    public string DatabaseName { get; set; } = "ScribeDiagnostics";
-}
-
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddScribeDiagnostics(
         this IServiceCollection services,
-        Action<ScribeDiagnosticsOptions> configure)
+        Action<ScribeOptions> configure)
     {
-        var options = new ScribeDiagnosticsOptions();
+        var options = new ScribeOptions();
         configure(options);
 
+        services.AddSingleton(options);
         services.AddSingleton<ScribeChannel>();
         services.AddSingleton<ScribeFactory>();
 
