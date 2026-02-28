@@ -43,12 +43,19 @@ public sealed class ScribeEntry : IScribeEntry
         if (payload is BsonValue bv) return bv;
         try
         {
-            var json = System.Text.Json.JsonSerializer.Serialize(payload);
-            return BsonDocument.Parse($"{{\"v\":{json}}}")["v"];
+            return BsonValue.Create(payload);
         }
         catch
         {
-            return new BsonString(payload.ToString() ?? string.Empty);
+            try
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(payload);
+                return BsonDocument.Parse($"{{\"v\":{json}}}")["v"];
+            }
+            catch
+            {
+                return new BsonString(payload.ToString() ?? string.Empty);
+            }
         }
     }
 
