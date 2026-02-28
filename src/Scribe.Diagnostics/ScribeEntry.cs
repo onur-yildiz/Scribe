@@ -40,11 +40,17 @@ public sealed class ScribeEntry : IScribeEntry
     {
         _activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
         _record.Status = "Error";
+
+        var data = new Dictionary<string, string?>();
+        foreach (System.Collections.DictionaryEntry entry in ex.Data)
+            data[entry.Key?.ToString() ?? string.Empty] = entry.Value?.ToString();
+
         _record.Exceptions.Add(new ExceptionInfo
         {
             Type = ex.GetType().FullName ?? ex.GetType().Name,
             Message = ex.Message,
-            StackTrace = ex.StackTrace
+            StackTrace = ex.StackTrace,
+            Data = data
         });
     }
 
