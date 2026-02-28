@@ -20,6 +20,7 @@ public sealed class MongoActivityRecord
     public Dictionary<string, string> Baggage { get; set; } = new();
     public Dictionary<string, BsonValue> Dump { get; set; } = new();
     public List<ExceptionInfo> Exceptions { get; set; } = new();
+    public List<ScribeEventRecord> Events { get; set; } = new();
 }
 
 public sealed class ExceptionInfo
