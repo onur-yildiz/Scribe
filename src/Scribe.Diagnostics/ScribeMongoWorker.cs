@@ -29,39 +29,41 @@ public sealed class ScribeMongoWorker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var buffer = new List<MongoActivityRecord>(BatchSize);
-
-        await foreach (var record in _channel.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
+        try
         {
-            buffer.Add(record);
-
-            if (buffer.Count >= BatchSize)
+            await foreach (var record in _channel.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
             {
-                await FlushAsync(buffer, stoppingToken).ConfigureAwait(false);
-                continue;
+                buffer.Add(record);
+
+                if (buffer.Count >= BatchSize)
+                {
+                    await FlushAsync(buffer, stoppingToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                // Drain remaining items available right now without waiting
+                while (buffer.Count < BatchSize && _channel.Reader.TryRead(out var extra))
+                    buffer.Add(extra);
+
+                if (buffer.Count >= BatchSize || !await WaitForMoreAsync(stoppingToken).ConfigureAwait(false))
+                    await FlushAsync(buffer, stoppingToken).ConfigureAwait(false);
             }
-
-            // Drain remaining items available right now without waiting
-            while (buffer.Count < BatchSize && _channel.Reader.TryRead(out var extra))
-                buffer.Add(extra);
-
-            if (buffer.Count >= BatchSize || !await WaitForMoreAsync(stoppingToken).ConfigureAwait(false))
-                await FlushAsync(buffer, stoppingToken).ConfigureAwait(false);
         }
-
-        // Flush anything left after the channel is completed
-        if (buffer.Count > 0)
-            await FlushAsync(buffer, CancellationToken.None).ConfigureAwait(false);
-
-        // Drain any remaining items written before Complete() was called
-        while (_channel.Reader.TryRead(out var remaining))
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            buffer.Add(remaining);
-            if (buffer.Count >= BatchSize)
-                await FlushAsync(buffer, CancellationToken.None).ConfigureAwait(false);
+            // Host shutdown requested; StopAsync will complete and flush remaining records.
         }
 
         if (buffer.Count > 0)
-            await FlushAsync(buffer, CancellationToken.None).ConfigureAwait(false);
+            await FlushAsync(buffer, stoppingToken).ConfigureAwait(false);
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _channel.Complete();
+
+        await base.StopAsync(cancellationToken).ConfigureAwait(false);
+        await FlushRemainingAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<bool> WaitForMoreAsync(CancellationToken stoppingToken)
@@ -162,6 +164,22 @@ public sealed class ScribeMongoWorker : BackgroundService
         {
             _logger.LogError(ex, "Failed to flush {BatchSize} activity record(s) to MongoDB.", batch.Length);
         }
+    }
+
+    private async Task FlushRemainingAsync(CancellationToken cancellationToken)
+    {
+        var buffer = new List<MongoActivityRecord>(BatchSize);
+
+        while (_channel.Reader.TryRead(out var record))
+        {
+            buffer.Add(record);
+
+            if (buffer.Count >= BatchSize)
+                await FlushAsync(buffer, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (buffer.Count > 0)
+            await FlushAsync(buffer, cancellationToken).ConfigureAwait(false);
     }
 
     private static bool IsBsonSizeLimitError(WriteError error)

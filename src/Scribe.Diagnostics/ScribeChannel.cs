@@ -25,5 +25,5 @@ public sealed class ScribeChannel
     public void Enqueue(MongoActivityRecord record) =>
         _channel.Writer.TryWrite(record);
 
-    internal void Complete() => _channel.Writer.TryComplete();
+    public void Complete() => _channel.Writer.Complete();
 }
