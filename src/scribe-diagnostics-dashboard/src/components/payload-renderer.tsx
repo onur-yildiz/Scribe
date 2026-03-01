@@ -1,4 +1,7 @@
-import { Badge } from "@/components/ui/badge";
+"use client"
+
+import type { DumpValue } from "@/lib/api-types"
+import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -6,77 +9,282 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table"
 
-function formatValue(value: unknown): string {
-  if (value === null) return "null";
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  return JSON.stringify(value);
+type DumpObject = { [key: string]: DumpValue }
+
+function isPrimitive(value: DumpValue | undefined): value is string | number | boolean | null {
+  return value === null || ["string", "number", "boolean"].includes(typeof value)
 }
 
-function isObjectArray(value: unknown): value is Record<string, unknown>[] {
-  return Array.isArray(value) && value.length > 0 && value.every((item) => item && typeof item === "object" && !Array.isArray(item));
+function isObject(value: DumpValue): value is DumpObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-function PrimitiveRow({ label, value }: { label: string; value: string }) {
+function isObjectArray(value: DumpValue[]): value is DumpObject[] {
+  return value.length > 0 && value.every((item) => isObject(item))
+}
+
+function isPrimitiveArray(value: DumpValue[]): boolean {
+  return value.every((item) => isPrimitive(item))
+}
+
+function formatPrimitive(value: DumpValue | undefined): string {
+  if (value === undefined) {
+    return "not set"
+  }
+
+  if (value === null) {
+    return "null"
+  }
+
+  if (typeof value === "string") {
+    return value
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value)
+  }
+
+  return JSON.stringify(value)
+}
+
+function renderCompactValue(value: DumpValue | undefined): string {
+  if (isPrimitive(value)) {
+    return formatPrimitive(value)
+  }
+
+  return JSON.stringify(value)
+}
+
+function PrimitiveRow({
+  label,
+  value,
+}: {
+  label: string
+  value: DumpValue
+}) {
   return (
-    <div className="grid grid-cols-[10rem,1fr] gap-3 border-b border-border/60 px-3 py-2 text-sm last:border-b-0">
-      <p className="font-mono text-sky-400">{label}</p>
-      <p className="font-mono text-slate-200 break-all">{value}</p>
+    <div className="grid gap-2 rounded-xl border border-white/8 bg-slate-950/70 px-4 py-3 md:grid-cols-[14rem_minmax(0,1fr)]">
+      <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
+        {label}
+      </p>
+      <p className="break-all font-mono text-sm text-slate-100">
+        {formatPrimitive(value)}
+      </p>
     </div>
-  );
+  )
 }
 
-export function PayloadRenderer({ data }: { data: Record<string, unknown> }) {
+function ObjectSection({
+  label,
+  value,
+  depth,
+}: {
+  label: string
+  value: DumpObject
+  depth: number
+}) {
+  const entries = Object.entries(value)
+
+  return (
+    <section
+      className={`rounded-2xl border border-white/8 bg-slate-950/60 ${
+        depth > 0 ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]" : ""
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/6 px-4 py-3">
+        <p className="font-mono text-sm font-semibold text-slate-100">{label}</p>
+        <Badge variant="outline" className="border-white/10 text-slate-300">
+          {entries.length} field{entries.length === 1 ? "" : "s"}
+        </Badge>
+      </div>
+      <div className="space-y-3 p-4">
+        {entries.length === 0 ? (
+          <p className="text-sm text-slate-400">Empty object.</p>
+        ) : (
+          entries.map(([childKey, childValue]) => (
+            <RenderValue
+              key={childKey}
+              label={childKey}
+              value={childValue}
+              depth={depth + 1}
+            />
+          ))
+        )}
+      </div>
+    </section>
+  )
+}
+
+function ObjectArraySection({
+  label,
+  value,
+}: {
+  label: string
+  value: DumpObject[]
+}) {
+  const columns = Array.from(
+    new Set(value.flatMap((row) => Object.keys(row))),
+  )
+
+  return (
+    <section className="rounded-2xl border border-white/8 bg-slate-950/60">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/6 px-4 py-3">
+        <p className="font-mono text-sm font-semibold text-slate-100">{label}</p>
+        <Badge variant="outline" className="border-white/10 text-slate-300">
+          {value.length} row{value.length === 1 ? "" : "s"}
+        </Badge>
+      </div>
+      <Table className="min-w-full">
+        <TableHeader>
+          <TableRow className="border-white/8">
+            {columns.map((column) => (
+              <TableHead key={column} className="text-slate-300">
+                {column}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {value.map((row, rowIndex) => (
+            <TableRow key={`${label}-${rowIndex}`} className="border-white/6">
+              {columns.map((column) => (
+                <TableCell
+                  key={`${rowIndex}-${column}`}
+                  className="max-w-72 whitespace-normal font-mono text-xs text-slate-100"
+                >
+                  {renderCompactValue(row[column])}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </section>
+  )
+}
+
+function PrimitiveArraySection({
+  label,
+  value,
+}: {
+  label: string
+  value: DumpValue[]
+}) {
+  return (
+    <section className="rounded-2xl border border-white/8 bg-slate-950/60">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/6 px-4 py-3">
+        <p className="font-mono text-sm font-semibold text-slate-100">{label}</p>
+        <Badge variant="outline" className="border-white/10 text-slate-300">
+          {value.length} item{value.length === 1 ? "" : "s"}
+        </Badge>
+      </div>
+      <Table className="min-w-full">
+        <TableHeader>
+          <TableRow className="border-white/8">
+            <TableHead className="w-20 text-slate-300">Index</TableHead>
+            <TableHead className="text-slate-300">Value</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {value.map((item, index) => (
+            <TableRow key={`${label}-${index}`} className="border-white/6">
+              <TableCell className="font-mono text-xs text-slate-400">
+                {index}
+              </TableCell>
+              <TableCell className="max-w-72 whitespace-normal font-mono text-xs text-slate-100">
+                {formatPrimitive(item)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </section>
+  )
+}
+
+function ArrayFallback({
+  label,
+  value,
+}: {
+  label: string
+  value: DumpValue[]
+}) {
+  return (
+    <section className="rounded-2xl border border-white/8 bg-slate-950/60">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/6 px-4 py-3">
+        <p className="font-mono text-sm font-semibold text-slate-100">{label}</p>
+        <Badge variant="outline" className="border-white/10 text-slate-300">
+          Mixed array
+        </Badge>
+      </div>
+      <pre className="overflow-x-auto p-4 font-mono text-xs leading-6 text-slate-200">
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    </section>
+  )
+}
+
+function RenderValue({
+  label,
+  value,
+  depth,
+}: {
+  label: string
+  value: DumpValue
+  depth: number
+}) {
+  if (isPrimitive(value)) {
+    return <PrimitiveRow label={label} value={value} />
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return (
+        <section className="rounded-2xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="font-mono text-sm font-semibold text-slate-100">
+              {label}
+            </p>
+            <Badge variant="outline" className="border-white/10 text-slate-300">
+              Empty array
+            </Badge>
+          </div>
+        </section>
+      )
+    }
+
+    if (isObjectArray(value)) {
+      return <ObjectArraySection label={label} value={value} />
+    }
+
+    if (isPrimitiveArray(value)) {
+      return <PrimitiveArraySection label={label} value={value} />
+    }
+
+    return <ArrayFallback label={label} value={value} />
+  }
+
+  return <ObjectSection label={label} value={value} depth={depth} />
+}
+
+export function PayloadRenderer({ data }: { data: Record<string, DumpValue> }) {
+  const entries = Object.entries(data)
+
+  if (entries.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-6 text-sm text-slate-400">
+        No dump payload captured for this activity.
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
-      {Object.entries(data).map(([key, value]) => {
-        if (value === null || ["string", "number", "boolean"].includes(typeof value)) {
-          return <PrimitiveRow key={key} label={key} value={formatValue(value)} />;
-        }
-
-        if (isObjectArray(value)) {
-          const columns = Array.from(new Set(value.flatMap((row) => Object.keys(row))));
-          return (
-            <section key={key} className="rounded-md border border-border/70 bg-slate-950/30">
-              <div className="flex items-center justify-between px-3 py-2">
-                <p className="font-mono text-sm text-slate-100">{key}</p>
-                <Badge variant="secondary">{value.length} rows</Badge>
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {columns.map((column) => (
-                      <TableHead key={column}>{column}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {value.map((row, index) => (
-                    <TableRow key={index}>
-                      {columns.map((column) => (
-                        <TableCell key={column} className="font-mono text-xs">
-                          {formatValue(row[column])}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </section>
-          );
-        }
-
-        return (
-          <section key={key} className="rounded-md border border-border/70 bg-slate-950/30 p-3">
-            <p className="mb-2 font-mono text-sm text-slate-100">{key}</p>
-            <pre className="overflow-x-auto rounded bg-slate-950/70 p-3 font-mono text-xs text-slate-200">
-              {JSON.stringify(value, null, 2)}
-            </pre>
-          </section>
-        );
-      })}
+      {entries.map(([key, value]) => (
+        <RenderValue key={key} label={key} value={value} depth={0} />
+      ))}
     </div>
-  );
+  )
 }
