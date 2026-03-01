@@ -31,6 +31,10 @@ public sealed class TraceSummaryDto
 {
     public required string TraceId { get; init; }
 
+    public required string RootSpanId { get; init; }
+
+    public required string RootService { get; init; }
+
     public required long TotalDurationMs { get; init; }
 
     public required string RootOperation { get; init; }
@@ -53,6 +57,8 @@ public sealed class ActivitySpanDto
 
     public string? ParentSpanId { get; init; }
 
+    public required string ServiceName { get; init; }
+
     public required string Operation { get; init; }
 
     public required DateTime StartTimeUtc { get; init; }
@@ -62,6 +68,8 @@ public sealed class ActivitySpanDto
     public required string Status { get; init; }
 
     public required IReadOnlyDictionary<string, string> Tags { get; init; }
+
+    public required IReadOnlyDictionary<string, object?> Dump { get; init; }
 
     public required IReadOnlyCollection<ActivityEventDto> Events { get; init; }
 

@@ -17,6 +17,8 @@ public sealed class ActivitySearchRequest
 
     public DateTime? StartToUtc { get; init; }
 
+    public bool RootOnly { get; init; } = true;
+
     public int Page { get; init; } = 1;
 
     public int PageSize { get; init; } = 50;

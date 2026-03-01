@@ -8,6 +8,8 @@ import {
   Copy,
   Layers3,
   X,
+  List,
+  GitBranch,
 } from "lucide-react"
 
 import type { ActivitySpanDto, TraceDetailsDto } from "@/lib/api-types"
@@ -18,6 +20,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { TraceGraphView } from "@/components/trace-graph-view"
 
 function sortSpans(spans: ActivitySpanDto[]): ActivitySpanDto[] {
   return [...spans].sort((left, right) => {
@@ -636,6 +639,7 @@ export function TraceDetailsView({ trace }: { trace: TraceDetailsDto }) {
     trace.summary.rootSpanId || spans[0]?.spanId || "",
   )
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<"list" | "graph">("graph")
 
   useEffect(() => {
     if (!isModalOpen) {
@@ -699,42 +703,71 @@ export function TraceDetailsView({ trace }: { trace: TraceDetailsDto }) {
                 </p>
               </div>
 
-              <div className="grid gap-3 text-right sm:grid-cols-2 xl:grid-cols-4">
-                <div>
-                  <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                    Total Duration
-                  </p>
-                  <p className="mt-1 text-xl font-semibold text-white">
-                    {formatDuration(trace.summary.totalDurationMs)}
-                  </p>
+              <div className="flex items-center gap-4">
+                <div className="flex rounded-xl bg-slate-900/80 p-1 border border-white/10">
+                  <button
+                    onClick={() => setViewMode("graph")}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition",
+                      viewMode === "graph" 
+                        ? "bg-cyan-500/20 text-cyan-300" 
+                        : "text-slate-400 hover:text-slate-200"
+                    )}
+                  >
+                    <GitBranch className="size-3.5" />
+                    Graph
+                  </button>
+                  <button
+                    onClick={() => setViewMode("list")}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition",
+                      viewMode === "list" 
+                        ? "bg-cyan-500/20 text-cyan-300" 
+                        : "text-slate-400 hover:text-slate-200"
+                    )}
+                  >
+                    <List className="size-3.5" />
+                    List
+                  </button>
                 </div>
-                <div>
-                  <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                    Activities
-                  </p>
-                  <p className="mt-1 text-xl font-semibold text-white">
-                    {trace.summary.spanCount}
-                  </p>
-                </div>
-                <div>
-                  <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                    Started
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-slate-200">
-                    {formatUtcTimestamp(trace.summary.startTimeUtc)}
-                  </p>
-                </div>
-                <div>
-                  <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                    Status
-                  </p>
-                  <div className="mt-1 flex justify-end">
-                    <Badge
-                      variant="outline"
-                      className={getStatusBadgeClasses(trace.summary.status)}
-                    >
-                      {trace.summary.status || "Unset"}
-                    </Badge>
+
+                <div className="grid gap-3 text-right sm:grid-cols-2 xl:grid-cols-4">
+                  <div>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                      Total Duration
+                    </p>
+                    <p className="mt-1 text-xl font-semibold text-white">
+                      {formatDuration(trace.summary.totalDurationMs)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                      Activities
+                    </p>
+                    <p className="mt-1 text-xl font-semibold text-white">
+                      {trace.summary.spanCount}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                      Started
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-slate-200">
+                      {formatUtcTimestamp(trace.summary.startTimeUtc)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                      Status
+                    </p>
+                    <div className="mt-1 flex justify-end">
+                      <Badge
+                        variant="outline"
+                        className={getStatusBadgeClasses(trace.summary.status)}
+                      >
+                        {trace.summary.status || "Unset"}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -742,125 +775,135 @@ export function TraceDetailsView({ trace }: { trace: TraceDetailsDto }) {
           </div>
 
           <div className="px-2 py-3 sm:px-3 sm:py-4">
-            <div className="overflow-hidden rounded-3xl border border-white/8 bg-slate-950/40">
-              <div className="grid gap-4 border-b border-white/8 px-4 py-4 text-xs sm:grid-cols-[18rem_minmax(0,1fr)] sm:px-6">
-                <div className="font-mono uppercase tracking-[0.2em] text-slate-500">
-                  Activity
-                </div>
-                <div className="flex items-center justify-between font-mono uppercase tracking-[0.2em] text-slate-500">
-                  <span>0ms</span>
-                  <span>{formatDuration(totalDuration)}</span>
-                </div>
-              </div>
-
-              <div
-                className="space-y-2 p-3 sm:p-4"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(to right, rgba(148,163,184,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.04) 1px, transparent 1px)",
-                  backgroundSize: "96px 100%, 100% 54px",
+            {viewMode === "graph" ? (
+              <TraceGraphView 
+                trace={trace} 
+                onSpanSelect={(id) => {
+                  setSelectedSpanId(id)
+                  setIsModalOpen(true)
                 }}
-              >
-                {spans.map((span) => {
-                  const isSelected = span.spanId === selectedSpan.spanId
-                  const depth = depthBySpanId[span.spanId] ?? 0
-                  const barStart = new Date(span.startTimeUtc).getTime() - traceStart
-                  const barWidth = Math.max(span.durationMs, totalDuration * 0.01)
-                  const leftPercent = (barStart / totalDuration) * 100
-                  const widthPercent = (barWidth / totalDuration) * 100
-                  const tone = getServiceTone(span.serviceName)
+                selectedSpanId={selectedSpanId}
+              />
+            ) : (
+              <div className="overflow-hidden rounded-3xl border border-white/8 bg-slate-950/40">
+                <div className="grid gap-4 border-b border-white/8 px-4 py-4 text-xs sm:grid-cols-[18rem_minmax(0,1fr)] sm:px-6">
+                  <div className="font-mono uppercase tracking-[0.2em] text-slate-500">
+                    Activity
+                  </div>
+                  <div className="flex items-center justify-between font-mono uppercase tracking-[0.2em] text-slate-500">
+                    <span>0ms</span>
+                    <span>{formatDuration(totalDuration)}</span>
+                  </div>
+                </div>
 
-                  return (
-                    <div key={span.spanId} className="space-y-2">
-                      <div className="grid gap-3 sm:grid-cols-[18rem_minmax(0,1fr)]">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedSpanId(span.spanId)}
-                          className={cn(
-                            "rounded-2xl border px-4 py-3 text-left transition",
-                            isSelected
-                              ? "border-cyan-400/50 bg-cyan-500/10"
-                              : "border-white/8 bg-slate-950/60 hover:border-cyan-400/25 hover:bg-slate-950/80",
-                          )}
-                        >
-                          <div
-                            className="space-y-1"
-                            style={{ paddingLeft: `${depth * 0.9}rem` }}
-                          >
-                            <p
-                              className={cn(
-                                "font-mono text-[11px] uppercase tracking-[0.2em]",
-                                tone.icon,
-                              )}
-                            >
-                              {span.serviceName}
-                            </p>
-                            <p className="truncate text-sm font-semibold text-slate-100">
-                              {span.operation}
-                            </p>
-                            <p className="font-mono text-xs text-slate-400">
-                              {formatDuration(span.durationMs)}
-                            </p>
-                          </div>
-                        </button>
+                <div
+                  className="space-y-2 p-3 sm:p-4"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(to right, rgba(148,163,184,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.04) 1px, transparent 1px)",
+                    backgroundSize: "96px 100%, 100% 54px",
+                  }}
+                >
+                  {spans.map((span) => {
+                    const isSelected = span.spanId === selectedSpan.spanId
+                    const depth = depthBySpanId[span.spanId] ?? 0
+                    const barStart = new Date(span.startTimeUtc).getTime() - traceStart
+                    const barWidth = Math.max(span.durationMs, totalDuration * 0.01)
+                    const leftPercent = (barStart / totalDuration) * 100
+                    const widthPercent = (barWidth / totalDuration) * 100
+                    const tone = getServiceTone(span.serviceName)
 
-                        <button
-                          type="button"
-                          onClick={() => setSelectedSpanId(span.spanId)}
-                          className={cn(
-                            "relative h-16 rounded-2xl border text-left transition",
-                            isSelected
-                              ? "border-cyan-400/40 bg-cyan-500/[0.04]"
-                              : "border-white/8 bg-slate-950/30 hover:border-cyan-400/20 hover:bg-slate-950/45",
-                          )}
-                        >
-                          <div className="absolute inset-x-3 top-1/2 h-px -translate-y-1/2 bg-white/8" />
-                          <div
-                            className={cn(
-                              "absolute top-1/2 h-10 -translate-y-1/2 rounded-xl border px-3 py-2",
-                              tone.bar,
-                              tone.edge,
-                              isSelected && "ring-1 ring-cyan-300/40",
-                              span.exceptions.length > 0 &&
-                                "border-red-400/60 bg-red-500/20 text-red-100",
-                            )}
-                            style={{
-                              left: `min(calc(${Math.max(leftPercent, 0.2)}% + 0.5rem), calc(100% - 4.75rem))`,
-                              width: `max(${Math.min(widthPercent, 100)}%, 4rem)`,
-                              maxWidth: "calc(100% - 1rem)",
-                            }}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="truncate text-sm font-semibold">
-                                {span.operation}
-                              </span>
-                              <span className="shrink-0 font-mono text-xs">
-                                {formatDuration(span.durationMs)}
-                              </span>
-                            </div>
-                          </div>
-                        </button>
-                      </div>
-
-                      {isSelected ? (
+                    return (
+                      <div key={span.spanId} className="space-y-2">
                         <div className="grid gap-3 sm:grid-cols-[18rem_minmax(0,1fr)]">
-                          <div className="hidden sm:block" />
-                          <ActivityOverviewCard
-                            span={span}
-                            traceStart={traceStart}
-                            onShowDetails={() => setIsModalOpen(true)}
-                          />
+                          <button
+                            type="button"
+                            onClick={() => setSelectedSpanId(span.spanId)}
+                            className={cn(
+                              "rounded-2xl border px-4 py-3 text-left transition",
+                              isSelected
+                                ? "border-cyan-400/50 bg-cyan-500/10"
+                                : "border-white/8 bg-slate-950/60 hover:border-cyan-400/25 hover:bg-slate-950/80",
+                            )}
+                          >
+                            <div
+                              className="space-y-1"
+                              style={{ paddingLeft: `${depth * 0.9}rem` }}
+                            >
+                              <p
+                                className={cn(
+                                  "font-mono text-[11px] uppercase tracking-[0.2em]",
+                                  tone.icon,
+                                )}
+                              >
+                                {span.serviceName}
+                              </p>
+                              <p className="truncate text-sm font-semibold text-slate-100">
+                                {span.operation}
+                              </p>
+                              <p className="font-mono text-xs text-slate-400">
+                                {formatDuration(span.durationMs)}
+                              </p>
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedSpanId(span.spanId)}
+                            className={cn(
+                              "relative h-16 rounded-2xl border text-left transition",
+                              isSelected
+                                ? "border-cyan-400/40 bg-cyan-500/[0.04]"
+                                : "border-white/8 bg-slate-950/30 hover:border-cyan-400/20 hover:bg-slate-950/45",
+                            )}
+                          >
+                            <div className="absolute inset-x-3 top-1/2 h-px -translate-y-1/2 bg-white/8" />
+                            <div
+                              className={cn(
+                                "absolute top-1/2 h-10 -translate-y-1/2 rounded-xl border px-3 py-2",
+                                tone.bar,
+                                tone.edge,
+                                isSelected && "ring-1 ring-cyan-300/40",
+                                span.exceptions.length > 0 &&
+                                  "border-red-400/60 bg-red-500/20 text-red-100",
+                              )}
+                              style={{
+                                left: `min(calc(${Math.max(leftPercent, 0.2)}% + 0.5rem), calc(100% - 4.75rem))`,
+                                width: `max(${Math.min(widthPercent, 100)}%, 4rem)`,
+                                maxWidth: "calc(100% - 1rem)",
+                              }}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="truncate text-sm font-semibold">
+                                  {span.operation}
+                                </span>
+                                <span className="shrink-0 font-mono text-xs">
+                                  {formatDuration(span.durationMs)}
+                                </span>
+                              </div>
+                            </div>
+                          </button>
                         </div>
-                      ) : null}
-                    </div>
-                  )
-                })}
+
+                        {isSelected ? (
+                          <div className="grid gap-3 sm:grid-cols-[18rem_minmax(0,1fr)]">
+                            <div className="hidden sm:block" />
+                            <ActivityOverviewCard
+                              span={span}
+                              traceStart={traceStart}
+                              onShowDetails={() => setIsModalOpen(true)}
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </section>
       </div>
-
       {isModalOpen ? (
         <ActivityDetailsModal
           trace={trace}
