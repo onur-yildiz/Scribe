@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useRef, useState } from "react"
+import React, { useMemo, useRef, useState, useEffect } from "react"
 import { 
   Network, 
   ShieldCheck, 
@@ -10,9 +10,11 @@ import {
   Zap, 
   AlertCircle,
   Maximize2,
-  Minimize2
+  Minimize2,
+  RotateCcw,
+  Clock
 } from "lucide-react"
-import type { TraceDetailsDto } from "@/lib/api-types"
+import type { TraceDetailsDto, ActivitySpanDto } from "@/lib/api-types"
 import { formatDuration } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -40,13 +42,46 @@ const getServiceIcon = (serviceName: string) => {
 
 const TIME_SCALE = 0.5 // pixels per ms at 100% zoom
 
+function NodeHoverCard({ span }: { span: ActivitySpanDto }) {
+  return (
+    <div className="w-64 p-4 rounded-2xl bg-slate-900/95 border border-cyan-500/30 backdrop-blur-xl shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-widest">{span.serviceName}</span>
+        <Badge className="text-[10px] px-1.5 py-0 border-cyan-500/30 text-cyan-300 bg-cyan-500/10">
+          {span.status || "OK"}
+        </Badge>
+      </div>
+      <h4 className="text-sm font-bold text-white mb-1 truncate">{span.operation}</h4>
+      <div className="flex items-center gap-2 text-slate-400 text-[11px] mb-3">
+        <Clock className="size-3" />
+        <span>{formatDuration(span.durationMs)}</span>
+        <div className="w-1 h-1 rounded-full bg-slate-600" />
+        <span>{Object.keys(span.tags).length} tags</span>
+      </div>
+      <div className="space-y-1.5">
+        {Object.entries(span.tags).slice(0, 3).map(([key, value]) => (
+          <div key={key} className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-mono text-slate-500 uppercase truncate max-w-[80px]">{key}</span>
+            <span className="text-[10px] font-mono text-slate-300 truncate text-right">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function Badge({ children, className }: { children: React.ReactNode, className?: string }) {
+  return <div className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2", className)}>{children}</div>
+}
+
 export function TraceGraphView({ trace, onSpanSelect, selectedSpanId }: TraceGraphViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
-  const [offset, setOffset] = useState({ x: 50, y: 50 })
+  const [offset, setOffset] = useState({ x: 50, y: 120 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [hoveredSpanId, setHoveredSpanId] = useState<string | null>(null)
+  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 })
 
   const traceStart = useMemo(() => new Date(trace.summary.startTimeUtc).getTime(), [trace.summary.startTimeUtc])
 
@@ -74,7 +109,7 @@ export function TraceGraphView({ trace, onSpanSelect, selectedSpanId }: TraceGra
       const children = childrenMap.get(spanId) || []
       
       // First, place this node
-      finalPositions[spanId] = { x, y: nextY * 80, depth }
+      finalPositions[spanId] = { x, y: nextY * 100, depth }
       nextY++
 
       children.forEach(childId => {
@@ -89,7 +124,8 @@ export function TraceGraphView({ trace, onSpanSelect, selectedSpanId }: TraceGra
   }, [trace.spans, traceStart])
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 0) {
+    // Support left click (0) and middle click (1)
+    if (e.button === 0 || e.button === 1) {
       setIsDragging(true)
       setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y })
     }
@@ -102,23 +138,40 @@ export function TraceGraphView({ trace, onSpanSelect, selectedSpanId }: TraceGra
         y: e.clientY - dragStart.y
       })
     }
+    
+    if (hoveredSpanId) {
+      setHoverPos({ x: e.clientX, y: e.clientY })
+    }
   }
 
   const handleMouseUp = () => {
     setIsDragging(false)
   }
 
-  const handleWheel = (e: React.WheelEvent) => {
-    if (e.ctrlKey) {
-      const zoomDelta = -e.deltaY * 0.001
-      setZoom(prev => Math.min(Math.max(prev + zoomDelta, 0.1), 5))
-      e.preventDefault()
-    } else {
-      setOffset(prev => ({
-        x: prev.x - e.deltaX,
-        y: prev.y - e.deltaY
-      }))
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const handleNativeWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault()
+        const zoomDelta = -e.deltaY * 0.001
+        setZoom(prev => Math.min(Math.max(prev + zoomDelta, 0.1), 5))
+      } else {
+        setOffset(prev => ({
+          x: prev.x - e.deltaX,
+          y: prev.y - e.deltaY
+        }))
+      }
     }
+
+    container.addEventListener('wheel', handleNativeWheel, { passive: false })
+    return () => container.removeEventListener('wheel', handleNativeWheel)
+  }, [])
+
+  const resetZoom = () => {
+    setZoom(1)
+    setOffset({ x: 50, y: 120 })
   }
 
   const totalDuration = trace.summary.totalDurationMs
@@ -146,15 +199,17 @@ export function TraceGraphView({ trace, onSpanSelect, selectedSpanId }: TraceGra
     return lines
   }, [totalDuration])
 
+  const hoveredSpan = trace.spans.find(s => s.spanId === hoveredSpanId)
+
   return (
     <div 
       ref={containerRef}
-      className="relative h-[650px] w-full overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#020617] cursor-grab active:cursor-grabbing shadow-2xl"
+      className="relative h-full w-full overflow-hidden bg-[#020617] cursor-grab active:cursor-grabbing"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      onWheel={handleWheel}
+      onContextMenu={(e) => e.preventDefault()}
     >
       {/* Grid Background */}
       <div 
@@ -169,36 +224,49 @@ export function TraceGraphView({ trace, onSpanSelect, selectedSpanId }: TraceGra
         }}
       />
 
-      {/* Header Info */}
-      <div className="absolute top-8 left-10 z-10 pointer-events-none">
-        <div className="flex items-center gap-4">
-          <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-400/20 backdrop-blur-md">
-            <Network className="size-6 text-cyan-400" />
-          </div>
-          <div>
-            <h3 className="text-white font-bold text-xl tracking-tight">{trace.summary.rootOperation}</h3>
-            <p className="text-slate-400 font-mono text-xs mt-0.5">Trace ID: {trace.summary.traceId}</p>
-          </div>
+      {/* Fixed Time Labels Layer */}
+      <div className="absolute top-0 inset-x-0 h-10 z-20 pointer-events-none bg-[#020617] border-b border-white/5 overflow-hidden">
+        <div 
+          className="relative h-full"
+          style={{
+            transform: `translateX(${offset.x}px) scaleX(${zoom})`,
+            transformOrigin: '0 0'
+          }}
+        >
+          {guideLines.map(t => (
+            <div 
+              key={`guide-label-${t}`}
+              className="absolute top-0 bottom-0 border-l border-cyan-500/10 flex items-center"
+              style={{ left: t * TIME_SCALE }}
+            >
+              <span className="ml-2 text-[10px] font-mono text-cyan-500/40" style={{ transform: `scaleX(${1/zoom})`, transformOrigin: '0 50%' }}>{t}ms</span>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className="absolute top-8 right-10 z-10 text-right pointer-events-none">
-        <p className="text-white font-bold text-2xl tracking-tight">{formatDuration(trace.summary.totalDurationMs)}</p>
-        <p className="text-slate-500 font-mono text-[10px] uppercase tracking-[0.2em] mt-0.5">Total Duration</p>
-      </div>
-
-      <div className="absolute top-8 right-56 z-10 flex gap-2">
+      {/* Control Overlays */}
+      <div className="absolute top-14 right-8 z-30 flex gap-2">
          <button 
           onClick={() => setZoom(z => Math.min(z + 0.2, 5))}
           className="p-2.5 rounded-xl bg-slate-900/80 border border-white/10 text-slate-400 hover:text-cyan-400 hover:border-cyan-400/30 transition-all backdrop-blur-md"
+          title="Zoom In"
         >
           <Maximize2 className="size-4" />
         </button>
         <button 
           onClick={() => setZoom(z => Math.max(z - 0.2, 0.1))}
           className="p-2.5 rounded-xl bg-slate-900/80 border border-white/10 text-slate-400 hover:text-cyan-400 hover:border-cyan-400/30 transition-all backdrop-blur-md"
+          title="Zoom Out"
         >
           <Minimize2 className="size-4" />
+        </button>
+        <button 
+          onClick={resetZoom}
+          className="p-2.5 rounded-xl bg-slate-900/80 border border-white/10 text-slate-400 hover:text-cyan-400 hover:border-cyan-400/30 transition-all backdrop-blur-md"
+          title="Reset Zoom"
+        >
+          <RotateCcw className="size-4" />
         </button>
       </div>
 
@@ -210,15 +278,13 @@ export function TraceGraphView({ trace, onSpanSelect, selectedSpanId }: TraceGra
           transformOrigin: '0 0'
         }}
       >
-        {/* Guide Lines */}
+        {/* Guide Lines (Lines only) */}
         {guideLines.map(t => (
           <div 
-            key={`guide-${t}`}
-            className="absolute top-[-1000px] bottom-[-1000px] border-l border-cyan-500/5 flex flex-col items-start"
+            key={`guide-line-${t}`}
+            className="absolute top-[-2000px] bottom-[-2000px] border-l border-cyan-500/5"
             style={{ left: t * TIME_SCALE }}
-          >
-            <span className="mt-[1000px] ml-2 text-[10px] font-mono text-cyan-500/30">{t}ms</span>
-          </div>
+          />
         ))}
 
         <svg className="absolute inset-0 w-full h-full overflow-visible pointer-events-none">
@@ -333,26 +399,41 @@ export function TraceGraphView({ trace, onSpanSelect, selectedSpanId }: TraceGra
         })}
       </div>
 
+      {/* Hover Overview Card Overlay */}
+      {hoveredSpan && (
+        <div 
+          className="fixed z-50 pointer-events-none"
+          style={{ 
+            left: hoverPos.x + 20, 
+            top: hoverPos.y + 20 
+          }}
+        >
+          <NodeHoverCard span={hoveredSpan} />
+        </div>
+      )}
+
       {/* Minimap/Timeline at bottom */}
-      <div className="absolute bottom-10 inset-x-12 h-14 bg-slate-900/60 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
+      <div className="absolute bottom-10 inset-x-12 h-16 bg-slate-950/80 backdrop-blur-2xl rounded-2xl border border-white/10 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)]">
         <div className="relative h-full w-full px-4 py-4">
-          <div className="absolute top-1 left-4 text-[8px] font-mono text-slate-500 uppercase tracking-widest">0ms</div>
-          <div className="absolute top-1 right-4 text-[8px] font-mono text-slate-500 uppercase tracking-widest">{formatDuration(totalDuration)}</div>
+          <div className="absolute top-1.5 left-4 text-[7px] font-mono text-slate-500 uppercase tracking-[0.2em] opacity-70">0ms</div>
+          <div className="absolute top-1.5 right-4 text-[7px] font-mono text-slate-500 uppercase tracking-[0.2em] opacity-70">{formatDuration(totalDuration)}</div>
           
           <div className="relative w-full h-full flex items-center">
             {trace.spans.map(span => {
               const start = new Date(span.startTimeUtc).getTime() - traceStart
               const duration = span.durationMs
               const left = (start / totalDuration) * 100
-              const width = Math.max((duration / totalDuration) * 100, 0.5)
+              const width = Math.max((duration / totalDuration) * 100, 0.4)
               const hasError = span.status.toLowerCase().includes('fail') || span.status.toLowerCase().includes('error') || span.exceptions.length > 0
 
               return (
                 <div 
                   key={`mini-${span.spanId}`}
                   className={cn(
-                    "absolute h-1.5 rounded-full transition-opacity",
-                    hasError ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : "bg-cyan-500/40"
+                    "absolute h-3 rounded-full transition-all duration-300",
+                    hasError 
+                      ? "bg-red-600 z-10 shadow-[0_0_12px_rgba(220,38,38,0.6)]" 
+                      : "bg-blue-600/40 hover:bg-blue-600/60 transition-colors"
                   )}
                   style={{
                     left: `${left}%`,
@@ -363,15 +444,17 @@ export function TraceGraphView({ trace, onSpanSelect, selectedSpanId }: TraceGra
             })}
           </div>
           
-          {/* Viewport indicator */}
+          {/* Viewport indicator (Inner Bar) */}
           <div 
-            className="absolute h-full top-0 border-2 border-cyan-400/40 rounded-xl bg-cyan-400/5 transition-all pointer-events-none"
+            className="absolute h-full top-0 border-2 border-blue-400/40 rounded-xl bg-blue-100/15 transition-all pointer-events-none z-20 shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]"
             style={{
               left: `${minimapViewport.left}%`,
               width: `${minimapViewport.width}%`,
             }}
           >
             <div className="absolute inset-0 border-[1px] border-white/5 rounded-xl" />
+            <div className="absolute inset-x-0 -top-1 h-1 bg-blue-400/20 blur-[2px]" />
+            <div className="absolute inset-x-0 -bottom-1 h-1 bg-blue-400/20 blur-[2px]" />
           </div>
         </div>
       </div>

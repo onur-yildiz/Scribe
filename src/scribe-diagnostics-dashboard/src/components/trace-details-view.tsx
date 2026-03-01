@@ -1,16 +1,18 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+
 import {
   AlertCircle,
   ChevronRight,
   Clock3,
   Copy,
-  Layers3,
-  X,
   List,
   GitBranch,
-} from "lucide-react"
+  X,
+  } from "lucide-react"
+
 
 import type { ActivitySpanDto, TraceDetailsDto } from "@/lib/api-types"
 import { formatDuration, formatOffset, formatUtcTimestamp } from "@/lib/format"
@@ -212,10 +214,14 @@ function ActivityOverviewCard({
   span,
   traceStart,
   onShowDetails,
+  onSelectSpan,
+  parentOperation,
 }: {
   span: ActivitySpanDto
   traceStart: number
   onShowDetails: () => void
+  onSelectSpan?: (spanId: string) => void
+  parentOperation?: string
 }) {
   const startOffsetMs = new Date(span.startTimeUtc).getTime() - traceStart
   const tagEntries = Object.entries(span.tags).slice(0, 4)
@@ -261,9 +267,18 @@ function ActivityOverviewCard({
               <p className="font-mono text-xs uppercase tracking-[0.2em] text-slate-400">
                 Parent
               </p>
-              <p className="break-all font-mono text-sm text-slate-100">
-                {span.parentSpanId || "Root activity"}
-              </p>
+              {span.parentSpanId ? (
+                <button
+                  onClick={() => onSelectSpan?.(span.parentSpanId!)}
+                  className="w-fit text-left break-all font-mono text-sm text-cyan-400 hover:text-cyan-300 hover:underline transition"
+                >
+                  {parentOperation ? `${parentOperation} (${span.parentSpanId})` : span.parentSpanId}
+                </button>
+              ) : (
+                <p className="break-all font-mono text-sm text-slate-100">
+                  Root activity
+                </p>
+              )}
             </div>
             <div className="grid gap-2 md:grid-cols-[10rem_minmax(0,1fr)]">
               <p className="font-mono text-xs uppercase tracking-[0.2em] text-slate-400">
@@ -632,7 +647,7 @@ function ActivityDetailsModal({
   )
 }
 
-export function TraceDetailsView({ trace }: { trace: TraceDetailsDto }) {
+export function TraceDetailsView({ trace, backHref }: { trace: TraceDetailsDto, backHref: string }) {
   const spans = useMemo(() => sortSpans(trace.spans), [trace.spans])
   const depthBySpanId = useMemo(() => buildDepthMap(spans), [spans])
   const [selectedSpanId, setSelectedSpanId] = useState(
@@ -640,6 +655,18 @@ export function TraceDetailsView({ trace }: { trace: TraceDetailsDto }) {
   )
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [viewMode, setViewMode] = useState<"list" | "graph">("graph")
+
+  const handleSelectSpan = (spanId: string, scroll = false) => {
+    setSelectedSpanId(spanId)
+    if (scroll && viewMode === "list") {
+      window.setTimeout(() => {
+        const element = document.getElementById(`span-row-${spanId}`)
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" })
+        }
+      }, 40)
+    }
+  }
 
   useEffect(() => {
     if (!isModalOpen) {
@@ -680,111 +707,93 @@ export function TraceDetailsView({ trace }: { trace: TraceDetailsDto }) {
 
   return (
     <>
-      <div className="space-y-6">
-        <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.22),transparent_30%),linear-gradient(180deg,rgba(2,6,23,0.96),rgba(3,7,18,0.9))] shadow-[0_24px_90px_rgba(2,6,23,0.55)]">
-          <div className="border-b border-white/8 px-5 py-5 sm:px-8">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-3">
-                    <Layers3 className="size-5 text-cyan-300" />
-                  </div>
-                  <div>
-                    <p className="font-mono text-xs uppercase tracking-[0.2em] text-cyan-300">
-                      {trace.summary.rootService}
-                    </p>
-                    <h2 className="text-2xl font-semibold text-white">
-                      {trace.summary.rootOperation}
-                    </h2>
-                  </div>
-                </div>
-                <p className="font-mono text-xs text-slate-400">
-                  Trace ID: {trace.summary.traceId}
+      <div className="flex h-screen flex-col overflow-hidden">
+        <header className="flex flex-wrap items-center justify-between gap-6 px-6 py-5 border-b border-white/10 bg-[#020617]">
+          <div className="flex items-center gap-8">
+            <Button
+              asChild
+              variant="outline"
+              className="h-9 border-white/10 bg-slate-950/70 px-4 text-slate-100 hover:bg-slate-900"
+            >
+              <Link href={backHref}>Back</Link>
+            </Button>
+            
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-3">
+                 <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.24em] text-cyan-400/80">
+                  Trace Details
+                </p>
+                <div className="h-px w-4 bg-white/10" />
+                <p className="font-mono text-[9px] text-slate-500 tracking-wider">
+                  {trace.summary.traceId}
                 </p>
               </div>
-
-              <div className="flex items-center gap-4">
-                <div className="flex rounded-xl bg-slate-900/80 p-1 border border-white/10">
-                  <button
-                    onClick={() => setViewMode("graph")}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition",
-                      viewMode === "graph" 
-                        ? "bg-cyan-500/20 text-cyan-300" 
-                        : "text-slate-400 hover:text-slate-200"
-                    )}
-                  >
-                    <GitBranch className="size-3.5" />
-                    Graph
-                  </button>
-                  <button
-                    onClick={() => setViewMode("list")}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition",
-                      viewMode === "list" 
-                        ? "bg-cyan-500/20 text-cyan-300" 
-                        : "text-slate-400 hover:text-slate-200"
-                    )}
-                  >
-                    <List className="size-3.5" />
-                    List
-                  </button>
-                </div>
-
-                <div className="grid gap-3 text-right sm:grid-cols-2 xl:grid-cols-4">
-                  <div>
-                    <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                      Total Duration
-                    </p>
-                    <p className="mt-1 text-xl font-semibold text-white">
-                      {formatDuration(trace.summary.totalDurationMs)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                      Activities
-                    </p>
-                    <p className="mt-1 text-xl font-semibold text-white">
-                      {trace.summary.spanCount}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                      Started
-                    </p>
-                    <p className="mt-1 text-sm font-medium text-slate-200">
-                      {formatUtcTimestamp(trace.summary.startTimeUtc)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                      Status
-                    </p>
-                    <div className="mt-1 flex justify-end">
-                      <Badge
-                        variant="outline"
-                        className={getStatusBadgeClasses(trace.summary.status)}
-                      >
-                        {trace.summary.status || "Unset"}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <h1 className="text-xl font-bold tracking-tight text-white">
+                {trace.summary.rootOperation}
+              </h1>
             </div>
           </div>
 
-          <div className="px-2 py-3 sm:px-3 sm:py-4">
-            {viewMode === "graph" ? (
+          <div className="flex items-center gap-6">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="text-right">
+                <p className="font-mono text-[9px] uppercase tracking-[0.15em] text-slate-500 mb-0.5">Trace Window</p>
+                <p className="text-[11px] font-medium text-slate-300">
+                  {formatUtcTimestamp(trace.summary.startTimeUtc)} → {formatUtcTimestamp(trace.summary.endTimeUtc)}
+                </p>
+              </div>
+              <div className="h-8 w-px bg-white/10 mx-2 hidden sm:block" />
+              <div className="text-right">
+                <p className="font-mono text-[9px] uppercase tracking-[0.15em] text-slate-500 mb-0.5">Duration</p>
+                <p className="text-sm font-bold text-cyan-400">
+                  {formatDuration(trace.summary.totalDurationMs)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex rounded-xl bg-slate-900/80 p-1 border border-white/10 ml-4">
+              <button
+                onClick={() => setViewMode("graph")}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition",
+                  viewMode === "graph" 
+                    ? "bg-cyan-500/20 text-cyan-300" 
+                    : "text-slate-400 hover:text-slate-200"
+                )}
+              >
+                <GitBranch className="size-3.5" />
+                Graph
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition",
+                  viewMode === "list" 
+                    ? "bg-cyan-500/20 text-cyan-300" 
+                    : "text-slate-400 hover:text-slate-200"
+                )}
+              >
+                <List className="size-3.5" />
+                List
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-hidden">
+          {viewMode === "graph" ? (
+            <div className="h-full w-full">
               <TraceGraphView 
                 trace={trace} 
                 onSpanSelect={(id) => {
-                  setSelectedSpanId(id)
+                  handleSelectSpan(id)
                   setIsModalOpen(true)
                 }}
                 selectedSpanId={selectedSpanId}
               />
-            ) : (
+            </div>
+          ) : (
+            <div className="h-full overflow-y-auto px-6 py-6 scrollbar-hide">
               <div className="overflow-hidden rounded-3xl border border-white/8 bg-slate-950/40">
                 <div className="grid gap-4 border-b border-white/8 px-4 py-4 text-xs sm:grid-cols-[18rem_minmax(0,1fr)] sm:px-6">
                   <div className="font-mono uppercase tracking-[0.2em] text-slate-500">
@@ -814,11 +823,11 @@ export function TraceDetailsView({ trace }: { trace: TraceDetailsDto }) {
                     const tone = getServiceTone(span.serviceName)
 
                     return (
-                      <div key={span.spanId} className="space-y-2">
+                      <div key={span.spanId} id={`span-row-${span.spanId}`} className="space-y-2">
                         <div className="grid gap-3 sm:grid-cols-[18rem_minmax(0,1fr)]">
                           <button
                             type="button"
-                            onClick={() => setSelectedSpanId(span.spanId)}
+                            onClick={() => handleSelectSpan(span.spanId)}
                             className={cn(
                               "rounded-2xl border px-4 py-3 text-left transition",
                               isSelected
@@ -849,7 +858,7 @@ export function TraceDetailsView({ trace }: { trace: TraceDetailsDto }) {
 
                           <button
                             type="button"
-                            onClick={() => setSelectedSpanId(span.spanId)}
+                            onClick={() => handleSelectSpan(span.spanId)}
                             className={cn(
                               "relative h-16 rounded-2xl border text-left transition",
                               isSelected
@@ -892,6 +901,8 @@ export function TraceDetailsView({ trace }: { trace: TraceDetailsDto }) {
                               span={span}
                               traceStart={traceStart}
                               onShowDetails={() => setIsModalOpen(true)}
+                              onSelectSpan={(id) => handleSelectSpan(id, true)}
+                              parentOperation={spans.find(s => s.spanId === span.parentSpanId)?.operation}
                             />
                           </div>
                         ) : null}
@@ -900,9 +911,9 @@ export function TraceDetailsView({ trace }: { trace: TraceDetailsDto }) {
                   })}
                 </div>
               </div>
-            )}
-          </div>
-        </section>
+            </div>
+          )}
+        </div>
       </div>
       {isModalOpen ? (
         <ActivityDetailsModal
