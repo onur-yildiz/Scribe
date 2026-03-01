@@ -781,18 +781,20 @@ export function TraceDetailsView({ trace, backHref }: { trace: TraceDetailsDto, 
         </header>
 
         <div className="flex-1 overflow-hidden">
-          {viewMode === "graph" ? (
-            <div className="h-full w-full">
-              <TraceGraphView 
-                trace={trace} 
-                onSpanSelect={(id) => {
-                  handleSelectSpan(id)
-                  setIsModalOpen(true)
-                }}
-                selectedSpanId={selectedSpanId}
-              />
-            </div>
-          ) : (
+            {viewMode === "graph" ? (
+              <div className="h-full w-full">
+                <TraceGraphView 
+                  trace={trace} 
+                  onSpanSelect={(id, openDetails = true) => {
+                    handleSelectSpan(id)
+                    if (openDetails) {
+                      setIsModalOpen(true)
+                    }
+                  }}
+                  selectedSpanId={selectedSpanId}
+                />
+              </div>
+            ) : (
             <div className="h-full overflow-y-auto px-6 py-6 scrollbar-hide">
               <div className="overflow-hidden rounded-3xl border border-white/8 bg-slate-950/40">
                 <div className="grid gap-4 border-b border-white/8 px-4 py-4 text-xs sm:grid-cols-[18rem_minmax(0,1fr)] sm:px-6">
