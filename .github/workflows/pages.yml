@@ -1,0 +1,76 @@
+name: Deploy dashboard preview to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/scribe-diagnostics-dashboard/**"
+      - "activity-seed-long.js"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: src/scribe-diagnostics-dashboard/package-lock.json
+
+      - name: Install dependencies
+        working-directory: src/scribe-diagnostics-dashboard
+        run: npm ci
+
+      - name: Build static export
+        working-directory: src/scribe-diagnostics-dashboard
+        env:
+          NEXT_PUBLIC_PREVIEW_MODE: "true"
+          NEXT_PUBLIC_BASE_PATH: "/Scribe"
+        run: npm run build
+
+      - name: Deploy to gh-pages branch
+        run: |
+          cd src/scribe-diagnostics-dashboard/out
+          touch .nojekyll
+          git init
+          git checkout -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "chore: deploy dashboard preview [skip ci]"
+          git push --force \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
+            gh-pages
+
+      - name: Configure GitHub Pages source
+        run: |
+          # Try to create Pages with gh-pages as source; if it already exists (409), update it instead.
+          POST_RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pages" \
+            -d '{"source":{"branch":"gh-pages","path":"/"}}')
+          POST_CODE=$(echo "$POST_RESPONSE" | tail -1)
+          echo "POST /pages → $POST_CODE"
+          if [ "$POST_CODE" = "409" ]; then
+            PUT_RESPONSE=$(curl -s -w "\n%{http_code}" \
+              -X PUT \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/pages" \
+              -d '{"source":{"branch":"gh-pages","path":"/"}}')
+            echo "PUT /pages → $(echo "$PUT_RESPONSE" | tail -1)"
+          fi
