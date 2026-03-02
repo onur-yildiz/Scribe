@@ -2,15 +2,9 @@ import Link from "next/link"
 
 import { buildBackToSearchHref, type SearchParamRecord } from "@/lib/activity-search"
 import { DiagnosticsApiError, getTraceDetails } from "@/lib/diagnostics-api"
-import { seedTraceIds } from "@/lib/preview-data"
 import { TraceDetailsView } from "@/components/trace-details-view"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-
-export async function generateStaticParams() {
-  if (process.env.NEXT_PUBLIC_PREVIEW_MODE !== "true") return []
-  return seedTraceIds.map((traceId) => ({ traceId }))
-}
 
 type TracePageProps = {
   params: Promise<{
@@ -24,14 +18,7 @@ export default async function TracePage({
   searchParams,
 }: TracePageProps) {
   const resolvedParams = await params
-  // In preview/static-export mode, searchParams cannot be awaited (dynamic API).
-  // The back link simply returns to the preview home page.
-  const resolvedSearchParams =
-    process.env.NEXT_PUBLIC_PREVIEW_MODE === "true"
-      ? {}
-      : searchParams
-        ? await searchParams
-        : {}
+  const resolvedSearchParams = searchParams ? await searchParams : {}
   const backHref = buildBackToSearchHref(resolvedSearchParams ?? {})
   let trace = null as Awaited<ReturnType<typeof getTraceDetails>>
   let stateTitle: string | null = null

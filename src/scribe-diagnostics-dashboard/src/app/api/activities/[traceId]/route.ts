@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server"
 
 import { DiagnosticsApiError, fetchTraceDetails } from "@/lib/diagnostics-api"
-import { seedTraceIds } from "@/lib/preview-data"
 
-export function generateStaticParams() {
-  if (process.env.NEXT_PUBLIC_PREVIEW_MODE !== "true") return []
-  return seedTraceIds.map((traceId) => ({ traceId }))
-}
+export const dynamic = "force-dynamic"
 
 type RouteProps = {
   params: Promise<{

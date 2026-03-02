@@ -6,12 +6,6 @@ import type {
   ApiErrorResponse,
   TraceDetailsDto,
 } from "@/lib/api-types"
-import {
-  getTraceDetailsFromSeed,
-  searchActivitiesFromSeed,
-} from "@/lib/preview-data"
-
-const IS_PREVIEW = process.env.NEXT_PUBLIC_PREVIEW_MODE === "true"
 
 const DEFAULT_API_BASE_URL = "http://localhost:5000"
 
@@ -94,9 +88,6 @@ async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
 export async function searchActivities(
   request: ActivitySearchRequest,
 ): Promise<ActivitySearchResponse> {
-  if (IS_PREVIEW) {
-    return searchActivitiesFromSeed(request)
-  }
   return await requestJson<ActivitySearchResponse>("/api/activities/search", {
     method: "POST",
     body: JSON.stringify(request),
@@ -104,13 +95,6 @@ export async function searchActivities(
 }
 
 export async function fetchTraceDetails(traceId: string): Promise<TraceDetailsDto> {
-  if (IS_PREVIEW) {
-    const result = getTraceDetailsFromSeed(traceId)
-    if (!result) {
-      throw new DiagnosticsApiError(`Trace ${traceId} not found.`, 404, null)
-    }
-    return result
-  }
   return await requestJson<TraceDetailsDto>(
     `/api/activities/${encodeURIComponent(traceId)}`,
     {
