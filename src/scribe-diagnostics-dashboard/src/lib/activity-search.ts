@@ -42,12 +42,20 @@ function normalizePageSize(value: string | undefined): number {
   return Math.min(Math.max(parsed, 1), 100)
 }
 
+// In preview mode the seed data covers 2026-02-21 – 2026-02-23, so widen
+// the default window to show everything without requiring manual filter input.
+const PREVIEW_DEFAULT_FROM = new Date("2026-02-21T00:00:00.000Z")
+const PREVIEW_DEFAULT_TO = new Date("2026-02-24T00:00:00.000Z")
+const IS_PREVIEW_MODE = process.env.NEXT_PUBLIC_PREVIEW_MODE === "true"
+
 export function normalizeActivitySearchState(
   raw: SearchParamRecord,
   now: Date = new Date(),
 ): ActivitySearchState {
-  const fallbackTo = new Date(now)
-  const fallbackFrom = new Date(now.getTime() - DEFAULT_RANGE_HOURS * 60 * 60 * 1000)
+  const fallbackTo = IS_PREVIEW_MODE ? PREVIEW_DEFAULT_TO : new Date(now)
+  const fallbackFrom = IS_PREVIEW_MODE
+    ? PREVIEW_DEFAULT_FROM
+    : new Date(now.getTime() - DEFAULT_RANGE_HOURS * 60 * 60 * 1000)
 
   let from = parseUtcDateTimeInput(firstValue(raw.from)) ?? fallbackFrom
   let to = parseUtcDateTimeInput(firstValue(raw.to)) ?? fallbackTo

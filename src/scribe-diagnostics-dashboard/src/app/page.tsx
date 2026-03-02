@@ -73,7 +73,14 @@ function renderPagerButton(
 }
 
 export default async function Home({ searchParams }: HomePageProps) {
-  const rawSearchParams = searchParams ? await searchParams : {}
+  // In preview/static-export mode, searchParams cannot be awaited (dynamic API).
+  // Use empty object so the preview date-range defaults (seed data window) apply.
+  const rawSearchParams =
+    process.env.NEXT_PUBLIC_PREVIEW_MODE === "true"
+      ? {}
+      : searchParams
+        ? await searchParams
+        : {}
   const state = normalizeActivitySearchState(rawSearchParams ?? {})
 
   let response: ActivitySearchResponse | null = null
@@ -191,7 +198,7 @@ export default async function Home({ searchParams }: HomePageProps) {
             </div>
           </CardHeader>
           <CardContent className="py-6">
-            <form method="get" action="/" className="space-y-5">
+            <form method="get" action={process.env.NEXT_PUBLIC_BASE_PATH || "/"} className="space-y-5">
               <input type="hidden" name="pageSize" value={state.pageSize} />
               <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-5">
                 <Field label="From (UTC)" htmlFor="from">
