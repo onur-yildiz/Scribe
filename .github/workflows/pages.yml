@@ -2,6 +2,7 @@ name: Deploy dashboard preview to GitHub Pages
 
 on:
   push:
+    branches: [main]
     paths:
       - "src/scribe-diagnostics-dashboard/**"
       - "activity-seed-long.js"
@@ -10,6 +11,11 @@ on:
 
 permissions:
   contents: write
+  pages: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -47,3 +53,24 @@ jobs:
           git push --force \
             "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
             gh-pages
+
+      - name: Configure GitHub Pages source
+        run: |
+          # Try to create Pages with gh-pages as source; if it already exists (409), update it instead.
+          POST_RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pages" \
+            -d '{"source":{"branch":"gh-pages","path":"/"}}')
+          POST_CODE=$(echo "$POST_RESPONSE" | tail -1)
+          echo "POST /pages → $POST_CODE"
+          if [ "$POST_CODE" = "409" ]; then
+            PUT_RESPONSE=$(curl -s -w "\n%{http_code}" \
+              -X PUT \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/pages" \
+              -d '{"source":{"branch":"gh-pages","path":"/"}}')
+            echo "PUT /pages → $(echo "$PUT_RESPONSE" | tail -1)"
+          fi

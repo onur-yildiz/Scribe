@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   ...(isPreview && {
     output: "export",
     basePath: "/Scribe",
+    trailingSlash: true,
     images: { unoptimized: true },
   }),
 };
