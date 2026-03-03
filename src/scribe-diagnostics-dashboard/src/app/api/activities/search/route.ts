@@ -3,8 +3,6 @@ import { NextResponse } from "next/server"
 import type { ActivitySearchRequest } from "@/lib/api-types"
 import { DiagnosticsApiError, searchActivities } from "@/lib/diagnostics-api"
 
-export const dynamic = "force-dynamic"
-
 export async function POST(request: Request) {
   let body: ActivitySearchRequest
 
